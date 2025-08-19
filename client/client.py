@@ -4,7 +4,7 @@ import requests
 import hashlib
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QListWidget, QHBoxLayout, QMessageBox,
-    QFileDialog, QSystemTrayIcon, QMenu, QProgressBar, QLabel
+    QSystemTrayIcon, QMenu, QProgressBar, QLabel
 )
 from PySide6.QtGui import QIcon, QAction
 from PySide6.QtCore import Qt, QThread, Signal, Slot, QTimer
@@ -41,6 +41,7 @@ class DownloadThread(QThread):
         url = SERVER_DOWNLOAD_URL.format(self.filename)
         local_path = os.path.join(LOCAL_DIR, self.filename)
         try:
+            os.makedirs(LOCAL_DIR, exist_ok=True)  # 保证文件夹存在
             r = requests.head(url)
             if r.status_code != 200 or "Content-Length" not in r.headers:
                 self.status.emit(f"{self.filename} 获取文件信息失败")
@@ -138,9 +139,16 @@ class SyncThread(QThread):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("文件同步客户端（断点续传+进度条+MD5智能同步）")
-        self.setWindowIcon(QIcon("icon.ico") if os.path.exists("icon.ico") else QIcon())
-        self.resize(500, 480)
+        self.setWindowTitle("文件同步客户端")
+        # 强制使用有效图标，icon.ico必须存在
+        icon_path = "icon.ico"
+        if not os.path.exists(icon_path):
+            # 可选：用默认Qt图标
+            app_icon = QIcon.fromTheme("application-exit")
+        else:
+            app_icon = QIcon(icon_path)
+        self.setWindowIcon(app_icon)
+        self.resize(520, 490)
         self.layout = QVBoxLayout(self)
 
         self.listWidget = QListWidget()
@@ -197,7 +205,7 @@ class MainWindow(QWidget):
         self.refresh_list()
 
         # 托盘相关
-        self.tray_icon = QSystemTrayIcon(QIcon("icon.ico") if os.path.exists("icon.ico") else QIcon(), self)
+        self.tray_icon = QSystemTrayIcon(app_icon, self)
         tray_menu = QMenu()
         restore_action = QAction("显示窗口")
         quit_action = QAction("退出")
@@ -214,7 +222,7 @@ class MainWindow(QWidget):
         self.hide()
 
     def closeEvent(self, event):
-        # 现在X号直接关闭程序
+        # X号关闭直接退出程序
         event.accept()
 
     def tray_activated(self, reason):
